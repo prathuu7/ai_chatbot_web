@@ -1,39 +1,27 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify
 import requests
-import datetime
 
 app = Flask(__name__)
 
+# Hugging Face API Key (we'll inject it from Render env vars)
 import os
-PERPLEXITY_API_KEY = os.getenv("PPLX_API_KEY")
+HF_API_KEY = os.getenv("HF_API_KEY")
+MODEL_URL = "https://api-inference.huggingface.co/models/gpt2"  # Free GPT-2 model (or you can pick another HF model)
 
-def home():
-    with open("index.html", "r") as f:
-        return f.read()
+headers = {"Authorization": f"Bearer {HF_API_KEY}"}
 
-@app.route('/chat', methods=['POST'])
+@app.route("/chat", methods=["POST"])
 def chat():
-    user_message = request.json.get("message", "")
-    date_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    headers = {
-        "Authorization": f"Bearer {PERPLEXITY_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    data = {
-        "model": "sonar-medium-online",
-        "messages": [{"role": "user", "content": f"{user_message} (Current time: {date_time})"}]
-    }
-
-    r = requests.post("https://api.perplexity.ai/chat/completions", headers=headers, json=data)
+    user_input = request.json.get("message", "")
+    data = {"inputs": user_input}
 
     try:
-        reply = r.json()['choices'][0]['message']['content']
-    except:
-        reply = "Sorry, I couldn’t get that."
+        response = requests.post(MODEL_URL, headers=headers, json=data)
+        text = response.json()[0]["generated_text"]
+    except Exception as e:
+        text = "Sorry, I couldn't generate a response."
 
-    return jsonify({"reply": reply})
+    return jsonify({"response": text})
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
